@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación completo para «Radar de Clientes» enfocado en el mercado de Colombia: prospección gratuita con IA de Gemini y rastreo de decisores, integración opcional con Google Cloud, arquitectura de 5 pantallas (Buscar, Ficha, Radar de Nichos, Mis Leads Kanban, Ajustes), modelo de datos desacoplado y sistema de puntuación de oportunidad (0-100).",
+  "updatedAt": "2026-10-17T14:54:29.458163093Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

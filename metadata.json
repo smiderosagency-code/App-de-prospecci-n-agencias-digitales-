@@ -1,0 +1,6 @@
+{
+  "name": "Radar de Clientes",
+  "description": "Herramienta de prospección B2B y auditoría de negocios locales en Colombia con IA y análisis de conversión.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
