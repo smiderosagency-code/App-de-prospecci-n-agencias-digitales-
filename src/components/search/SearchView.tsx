@@ -19,6 +19,8 @@ import {
   Square,
   AlertCircle,
   RefreshCw,
+  ShieldCheck,
+  Layers,
 } from 'lucide-react';
 
 interface Props {
@@ -31,6 +33,7 @@ interface Props {
   batchProgress?: { current: number; total: number; isRunning: boolean };
   providerUsed?: string;
   settings: AppSettings;
+  onCreateBatch?: () => void;
 }
 
 export const SearchView: React.FC<Props> = ({
@@ -43,6 +46,7 @@ export const SearchView: React.FC<Props> = ({
   batchProgress,
   providerUsed,
   settings,
+  onCreateBatch,
 }) => {
   // Search parameters
   const [selectedCity, setSelectedCity] = useState('Bogotá');
@@ -64,6 +68,10 @@ export const SearchView: React.FC<Props> = ({
     minRating: 0,
     minReviews: 0,
     hideClosed: true,
+    priorityFilter: 'ALL',
+    onlyHighIntent: false,
+    onlyWithDecisor: false,
+    readyToBuyFilter: 'ALL',
   });
 
   const colombianCities = [
@@ -114,11 +122,23 @@ export const SearchView: React.FC<Props> = ({
   const filteredLeads = leads.filter((lead) => {
     if (filters.onlyNoWebsite && lead.hasOwnWebsite) return false;
     if (filters.onlyWithPhone && !lead.phone) return false;
+    if (filters.priorityFilter === 'A' && lead.b2bIntelligence?.priority !== 'A') return false;
+    if (filters.readyToBuyFilter && filters.readyToBuyFilter !== 'ALL' && lead.b2bIntelligence?.readyToBuyStatus !== filters.readyToBuyFilter) return false;
+    if (filters.onlyHighIntent && lead.b2bIntelligence?.purchaseIntent !== 'Alta') return false;
+    if (filters.onlyWithDecisor && !lead.decisionMaker?.name) return false;
     if (filters.minRating > 0 && (lead.rating || 0) < filters.minRating) return false;
     if (filters.minReviews > 0 && (lead.userRatingCount || 0) < filters.minReviews) return false;
     if (filters.hideClosed && lead.businessStatus !== 'OPERATIONAL') return false;
     return true;
   });
+
+  // B2B Quality Metrics (Master Prompt Parameter #9 & Módulo Anti-Fallo)
+  const priorityACount = leads.filter((l) => l.b2bIntelligence?.priority === 'A').length;
+  const readyToBuyYesCount = leads.filter((l) => l.b2bIntelligence?.readyToBuyStatus === 'SÍ').length;
+  const withDecisorCount = leads.filter((l) => Boolean(l.decisionMaker?.name)).length;
+  const withWhatsAppCount = leads.filter((l) => Boolean(l.whatsappLink || l.whatsappNumber)).length;
+  const highIntentCount = leads.filter((l) => l.b2bIntelligence?.purchaseIntent === 'Alta').length;
+  const withEmailCount = leads.filter((l) => Boolean(l.b2bIntelligence?.institutionalEmail)).length;
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredLeads.length) {
@@ -353,7 +373,64 @@ export const SearchView: React.FC<Props> = ({
 
         {/* QUICK ONE-TOUCH FILTER PILLS (MOBILE FRIENDLY) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-          <span className="text-slate-400 font-medium whitespace-nowrap shrink-0">Filtro rápido:</span>
+          <span className="text-slate-400 font-medium whitespace-nowrap shrink-0">Filtros:</span>
+          
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, readyToBuyFilter: filters.readyToBuyFilter === 'SÍ' ? 'ALL' : 'SÍ' })}
+            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-bold border cursor-pointer ${
+              filters.readyToBuyFilter === 'SÍ'
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            {filters.readyToBuyFilter === 'SÍ' ? '✓ Lista para Comprar' : 'Lista para Comprar (SÍ)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, priorityFilter: filters.priorityFilter === 'A' ? 'ALL' : 'A' })}
+            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-semibold border cursor-pointer ${
+              filters.priorityFilter === 'A'
+                ? 'bg-rose-100 text-rose-900 border-rose-300 shadow-xs'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            {filters.priorityFilter === 'A' ? '✓ Prioridad A' : 'Prioridad A'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, onlyHighIntent: !filters.onlyHighIntent })}
+            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-semibold border cursor-pointer ${
+              filters.onlyHighIntent
+                ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            {filters.onlyHighIntent ? '✓ Intención Alta' : 'Intención Alta'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, onlyWithDecisor: !filters.onlyWithDecisor })}
+            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-semibold border cursor-pointer ${
+              filters.onlyWithDecisor
+                ? 'bg-indigo-100 text-indigo-900 border-indigo-300 shadow-xs'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            {filters.onlyWithDecisor ? '✓ Con Decisor' : 'Con Decisor'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, onlyWithPhone: !filters.onlyWithPhone })}
+            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-medium border cursor-pointer ${
+              filters.onlyWithPhone
+                ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-semibold shadow-xs'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            {filters.onlyWithPhone ? '✓ WhatsApp / Tel' : 'WhatsApp / Tel'}
+          </button>
           <button
             type="button"
             onClick={() => setFilters({ ...filters, onlyNoWebsite: !filters.onlyNoWebsite })}
@@ -365,36 +442,14 @@ export const SearchView: React.FC<Props> = ({
           >
             {filters.onlyNoWebsite ? '✓ Sin Web Propia' : 'Sin Web Propia'}
           </button>
-          <button
-            type="button"
-            onClick={() => setFilters({ ...filters, onlyWithPhone: !filters.onlyWithPhone })}
-            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-medium border cursor-pointer ${
-              filters.onlyWithPhone
-                ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-semibold shadow-xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            {filters.onlyWithPhone ? '✓ Con WhatsApp / Teléfono' : 'Con WhatsApp / Teléfono'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilters({ ...filters, minRating: filters.minRating === 4.0 ? 0 : 4.0 })}
-            className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors font-medium border cursor-pointer ${
-              filters.minRating === 4.0
-                ? 'bg-blue-100 text-blue-900 border-blue-300 font-semibold shadow-xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            {filters.minRating === 4.0 ? '✓ ⭐ 4.0+' : '⭐ 4.0+'}
-          </button>
         </div>
 
         {/* FILTERS & STATS STRIP */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap text-xs text-slate-600">
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer ${
                 showFilters
                   ? 'bg-slate-100 text-slate-900 border-slate-300'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -403,6 +458,18 @@ export const SearchView: React.FC<Props> = ({
               <Filter className="w-3.5 h-3.5" />
               <span>Filtros avanzados</span>
             </button>
+
+            {onCreateBatch && (
+              <button
+                type="button"
+                onClick={onCreateBatch}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-xs cursor-pointer"
+                title="Armar lote de 25 clínicas con pruebas A/B y medición a 72h"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Crear Lote 25 (A/B)</span>
+              </button>
+            )}
 
             {providerUsed && (
               <span className="text-slate-400">
@@ -538,6 +605,52 @@ export const SearchView: React.FC<Props> = ({
               <Sparkles className="w-3.5 h-3.5" />
               <span>Analizar seleccionados</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* B2B PIPELINE QUALITY METRICS DASHBOARD (Parameter #9) */}
+      {leads.length > 0 && (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-slate-800 space-y-2.5">
+          <div className="flex items-center justify-between text-xs border-b border-slate-700/60 pb-2 flex-wrap gap-2">
+            <span className="font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Métricas de Calidad de la Base de Prospección (S.Mideros Agency)</span>
+            </span>
+            <span className="text-slate-400 text-[11px]">
+              {leads.length} prospectos en <strong className="text-white">{effectiveCity}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center text-xs">
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Prioridad A</span>
+              <span className="text-base sm:text-lg font-black text-rose-400">{priorityACount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Lista p/ Comprar</span>
+              <span className="text-base sm:text-lg font-black text-emerald-400">{readyToBuyYesCount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Con Decisor</span>
+              <span className="text-base sm:text-lg font-black text-white">{withDecisorCount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">WhatsApp Válido</span>
+              <span className="text-base sm:text-lg font-black text-emerald-400">{withWhatsAppCount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Intención Alta</span>
+              <span className="text-base sm:text-lg font-black text-amber-400">{highIntentCount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Correo Inst.</span>
+              <span className="text-base sm:text-lg font-black text-blue-300">{withEmailCount}</span>
+            </div>
+            <div className="p-2 sm:p-2.5 rounded-lg bg-white/5 border border-white/5">
+              <span className="text-[10px] text-slate-400 block font-medium">Ley 1581</span>
+              <span className="text-base sm:text-lg font-black text-emerald-300">100% Pública</span>
+            </div>
           </div>
         </div>
       )}
@@ -726,8 +839,35 @@ export const SearchView: React.FC<Props> = ({
                   isSelected ? 'border-emerald-500 bg-emerald-50/20' : 'border-slate-200'
                 }`}
               >
+                {/* Header with Priority and Intent badges */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider border ${
+                        lead.b2bIntelligence?.priority === 'A'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        Prioridad {lead.b2bIntelligence?.priority || 'A'}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        lead.b2bIntelligence?.readyToBuyStatus === 'SÍ'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : lead.b2bIntelligence?.readyToBuyStatus === 'TAL VEZ'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                      }`}>
+                        Lista: {lead.b2bIntelligence?.readyToBuyStatus || 'SÍ'}
+                      </span>
+                      {lead.b2bIntelligence?.assignedVariant && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
+                          {lead.b2bIntelligence.assignedVariant.variantLetter === 'A' ? 'A (Resp. Lenta)' : 'B (Pacientes)'}
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        Intención: {lead.b2bIntelligence?.purchaseIntent || 'Alta'}
+                      </span>
+                    </div>
                     <h3 className="font-bold text-slate-900 text-sm line-clamp-1">{lead.name}</h3>
                     <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{lead.address}</p>
                   </div>
@@ -738,12 +878,45 @@ export const SearchView: React.FC<Props> = ({
                   />
                 </div>
 
+                {/* Commercial Leak Highlight */}
+                {lead.b2bIntelligence?.mainFunnelLeak && (
+                  <div className="text-[11px] bg-amber-50/70 text-amber-950 p-2 rounded-lg border border-amber-200/80 line-clamp-2 leading-relaxed">
+                    <span className="font-bold text-amber-900 block text-[10px] uppercase tracking-wide">Fuga Comercial:</span>
+                    {lead.b2bIntelligence.mainFunnelLeak}
+                  </div>
+                )}
+
+                {/* Microprueba Tag (Módulo Anti-Fallo) */}
+                {lead.b2bIntelligence?.painTest?.microTest && (
+                  <div className="text-[11px] bg-indigo-50/60 text-indigo-950 p-2 rounded-lg border border-indigo-100 flex items-start gap-1.5">
+                    <span className="font-bold text-indigo-800 text-[10px] uppercase shrink-0">Microprueba:</span>
+                    <span className="text-slate-700 line-clamp-1">{lead.b2bIntelligence.painTest.microTest}</span>
+                  </div>
+                )}
+
                 {/* Decisor Tag if any */}
                 {lead.decisionMaker?.name && (
-                  <div className="text-[11px] bg-emerald-50 text-emerald-900 p-2 rounded-lg flex items-center gap-1.5 font-medium border border-emerald-100">
-                    <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                    <span>
-                      Decisor: <strong>{lead.decisionMaker.name}</strong> ({lead.decisionMaker.role || 'Dueño'})
+                  <div className="text-[11px] bg-emerald-50 text-emerald-900 p-2 rounded-lg flex items-center justify-between gap-1.5 font-medium border border-emerald-100">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span className="truncate">
+                        Decisor: <strong>{lead.decisionMaker.name}</strong> ({lead.decisionMaker.role || 'Dueño'})
+                      </span>
+                    </div>
+                    {lead.b2bIntelligence?.decisionMakerStatus === 'Confirmado' && (
+                      <span className="text-[9px] bg-emerald-200/80 text-emerald-900 px-1 py-0.2 rounded font-bold uppercase shrink-0">
+                        Confirmado
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Treatments tags if available */}
+                {lead.b2bIntelligence?.highValueTreatments && lead.b2bIntelligence.highValueTreatments.length > 0 && (
+                  <div className="flex items-center gap-1 overflow-hidden text-[10px]">
+                    <span className="text-slate-400 font-semibold shrink-0">Tratamientos:</span>
+                    <span className="text-slate-700 font-medium truncate">
+                      {lead.b2bIntelligence.highValueTreatments.slice(0, 2).join(' • ')}
                     </span>
                   </div>
                 )}

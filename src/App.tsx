@@ -9,6 +9,7 @@ import { LeadsView } from './components/leads/LeadsView';
 import { NicheRadarView } from './components/radar/NicheRadarView';
 import { SettingsView } from './components/settings/SettingsView';
 import { BusinessDetailModal } from './components/business/BusinessDetailModal';
+import { BatchModuleView } from './components/batches/BatchModuleView';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
@@ -38,6 +39,13 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const handleOpenLeadById = (leadId: string) => {
+    const found = searchResults.find((l) => l.id === leadId) || savedLeads.find((l) => l.id === leadId);
+    if (found) {
+      handleOpenLeadModal(found);
+    }
+  };
+
   // Load leads and run an initial live search on start
   useEffect(() => {
     const existing = StorageService.getLeads();
@@ -57,7 +65,7 @@ export default function App() {
       setSettings(StorageService.getSettings());
       showToast(`${result.leads.length} negocios encontrados en ${city}`);
     } catch (err: any) {
-      alert(`Error al buscar: ${err.message}`);
+      showToast(`Error al buscar: ${err.message || 'Intenta de nuevo'}`);
     } finally {
       setIsSearching(false);
     }
@@ -169,6 +177,14 @@ export default function App() {
               batchProgress={batchProgress}
               providerUsed={providerUsed}
               settings={settings}
+              onCreateBatch={() => setCurrentView('batches')}
+            />
+          )}
+
+          {currentView === 'batches' && (
+            <BatchModuleView
+              onSelectLeadById={handleOpenLeadById}
+              availableLeads={searchResults.length > 0 ? searchResults : savedLeads}
             />
           )}
 

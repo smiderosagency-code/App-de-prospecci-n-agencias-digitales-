@@ -1,8 +1,8 @@
 import React from 'react';
-import { Search, Compass, Users, Settings, Target, MapPin, Zap } from 'lucide-react';
+import { Search, Compass, Users, Settings, Target, MapPin, Zap, Layers } from 'lucide-react';
 import { AppSettings } from '../../types';
 
-export type NavView = 'search' | 'leads' | 'radar' | 'settings';
+export type NavView = 'search' | 'batches' | 'leads' | 'radar' | 'settings';
 
 interface Props {
   currentView: NavView;
@@ -21,9 +21,16 @@ export const Sidebar: React.FC<Props> = ({
     {
       id: 'search' as NavView,
       label: 'Buscar',
-      fullLabel: 'Buscar Negocios',
+      fullLabel: 'Buscar Clínicas',
       icon: Search,
       badge: null,
+    },
+    {
+      id: 'batches' as NavView,
+      label: 'Lotes A/B',
+      fullLabel: 'Lotes & Pruebas A/B',
+      icon: Layers,
+      badge: 'Anti-Fallo',
     },
     {
       id: 'radar' as NavView,

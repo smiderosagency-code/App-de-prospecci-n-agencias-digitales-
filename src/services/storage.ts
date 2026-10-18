@@ -3,7 +3,7 @@
  * Designed with a clean repository interface to allow seamless migration to Firestore later.
  */
 
-import { AppSettings, BusinessLead } from '../types';
+import { AppSettings, BusinessLead, BatchCampaign, BatchLeadRecord, ABVariant } from '../types';
 
 const LEADS_STORAGE_KEY = 'radar_clientes_leads_v1';
 const SETTINGS_STORAGE_KEY = 'radar_clientes_settings_v1';
@@ -13,17 +13,21 @@ const DEFAULT_SETTINGS: AppSettings = {
   searchProvider: 'gemini_free',
   googleCloudApiKey: '',
   sellerProfile: {
-    name: 'Consultor Digital',
-    agencyName: 'Agencia de Automatización Digital',
+    name: 'S.Mideros Growth Team',
+    agencyName: 'S.Mideros Agency',
     servicesOffered: [
-      'Páginas web modernas de alta conversión',
-      'Agentes de Inteligencia Artificial por WhatsApp para citas y ventas 24/7',
-      'Sistemas automatizados de reservas y recordatorios para negocios locales',
+      'Sistema de Conversión de Pacientes 360°',
+      'Piloto Growth de 30 días para clínicas dentales y estéticas',
+      'Respuesta y seguimiento ultra rápido de leads por WhatsApp e Instagram DM',
+      'Automatización de recordatorios, reactivación de pacientes y citas',
+      'CRM comercial y organización del embudo de consultas a citas',
+      'Contenido en video y redes para generar confianza y autoridad',
     ],
     valueProposition:
-      'Ayudamos a negocios locales a digitalizarse, responder inmediatamente a prospectos por WhatsApp y no perder clientes frente a la competencia.',
+      'Instalamos el Sistema de Conversión de Pacientes 360° con un Piloto Growth de 30 días para resolver consultas sin respuesta, leads que se enfrían y pérdida de tratamientos de alto valor en clínicas colombianas.',
     defaultTone: 'consultive',
     whatsappContact: '+57 300 000 0000',
+    email: 's.miderosagency@gmail.com',
   },
   monthlyUsage: {
     month: new Date().toISOString().slice(0, 7), // "YYYY-MM"
@@ -219,5 +223,179 @@ export class StorageService {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Get all batches
+   */
+  static getBatches(): BatchCampaign[] {
+    try {
+      const data = localStorage.getItem('radar_clientes_batches_v1');
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Error reading batches from storage', e);
+      return [];
+    }
+  }
+
+  /**
+   * Save or update a batch
+   */
+  static saveBatch(batch: BatchCampaign): void {
+    const batches = this.getBatches();
+    const index = batches.findIndex((b) => b.id === batch.id);
+    if (index >= 0) {
+      batches[index] = batch;
+    } else {
+      batches.unshift(batch);
+    }
+    try {
+      localStorage.setItem('radar_clientes_batches_v1', JSON.stringify(batches));
+    } catch (e) {
+      console.error('Error saving batch', e);
+    }
+  }
+
+  /**
+   * Delete batch by ID
+   */
+  static deleteBatch(batchId: string): void {
+    const batches = this.getBatches().filter((b) => b.id !== batchId);
+    try {
+      localStorage.setItem('radar_clientes_batches_v1', JSON.stringify(batches));
+    } catch (e) {
+      console.error('Error deleting batch', e);
+    }
+  }
+
+  /**
+   * Create a new 25-lead batch with controlled A/B split
+   */
+  static createBatchFromLeads(
+    cityName: string,
+    nicheName: string,
+    inputLeads: BusinessLead[]
+  ): BatchCampaign {
+    const batches = this.getBatches();
+    const batchNumber = batches.length + 1;
+    const batchId = `lote-${batchNumber}-${Date.now().toString(36)}`;
+
+    // Pick top Priority A and 'SÍ'/'TAL VEZ' readyToBuy up to 25
+    const eligibleLeads = inputLeads
+      .filter((l) => l.b2bIntelligence?.readyToBuyStatus !== 'NO')
+      .slice(0, 25);
+
+    const records: BatchLeadRecord[] = eligibleLeads.map((lead, idx) => {
+      const isVariantA = idx % 2 === 0;
+      const b2b = lead.b2bIntelligence;
+      const decisorName = lead.decisionMaker?.name || 'Director(a)';
+
+      // Assign A/B Variant
+      const variant: ABVariant = isVariantA
+        ? {
+            variantLetter: 'A',
+            channel: 'WhatsApp',
+            angle: 'Respuesta lenta',
+            targetDecisor: 'Dueño / Director Médico',
+            variantCode: 'Variante A (WhatsApp · Fuga Respuesta Lenta · Dueño/Director)',
+            customPitch: `Hola ${decisorName}, estuve revisando ${lead.name} en ${lead.city}. Detectamos que muchas clínicas pierden hasta el 40% de consultas de ortodoncia e implantes por demorar más de 2 horas en responder en WhatsApp. En S.Mideros Agency instalamos un sistema que responde y califica en 60 segundos con un Piloto Growth de 30 días. ¿Cuándo tendrías 10 min para revisar tu embudo?`,
+          }
+        : {
+            variantLetter: 'B',
+            channel: 'WhatsApp',
+            angle: 'Pacientes inactivos',
+            targetDecisor: 'Gerente / Administrador',
+            variantCode: 'Variante B (WhatsApp · Reactivación Pacientes · Gerente)',
+            customPitch: `Hola ${decisorName}, te escribo respecto a ${lead.name} en ${lead.city}. Muchas clínicas tienen más de 200 pacientes inactivos que ya conocen el consultorio pero no volvieron. Con el Piloto Growth de S.Mideros Agency reactivamos entre 15 y 30 citas el primer mes sin gastar más en pauta. ¿Te gustaría ver cómo funciona el piloto de 30 días?`,
+          };
+
+      return {
+        leadId: lead.id,
+        leadName: lead.name,
+        priority: b2b?.priority || 'A',
+        readyToBuy: b2b?.readyToBuyStatus || 'SÍ',
+        variant,
+        sentStatus: 'pending',
+        responseStatus: 'no_response',
+        sentChannel: variant.channel,
+      };
+    });
+
+    const newBatch: BatchCampaign = {
+      id: batchId,
+      batchNumber,
+      name: `Lote ${batchNumber} · 25 Clínicas Prioridad A (${cityName})`,
+      city: cityName,
+      niche: nicheName,
+      createdAt: new Date().toISOString(),
+      targetSize: 25,
+      status: 'ready_to_send',
+      records,
+      metrics: {
+        totalInBatch: records.length,
+        priorityACount: records.filter((r) => r.priority === 'A').length,
+        readyToBuyYesCount: records.filter((r) => r.readyToBuy === 'SÍ').length,
+        sentCount: 0,
+        responsesCount: 0,
+        demosCount: 0,
+        pilotsCount: 0,
+      },
+      abSummary: {
+        variantA: {
+          count: records.filter((r) => r.variant.variantLetter === 'A').length,
+          responses: 0,
+          demos: 0,
+        },
+        variantB: {
+          count: records.filter((r) => r.variant.variantLetter === 'B').length,
+          responses: 0,
+          demos: 0,
+        },
+      },
+    };
+
+    this.saveBatch(newBatch);
+    return newBatch;
+  }
+
+  /**
+   * Check Anti-Fallo Escalation Rule:
+   * "Si tras 300–500 prospectos bien calificados no se logran al menos 3 demos y 1 piloto o cliente pagante, detén el escalado.
+   * Revisa primero: ICP, oferta, mensaje, canal y demo."
+   */
+  static getEscalationAuditStats(): {
+    totalAudited: number;
+    totalDemos: number;
+    totalPilots: number;
+    haltRequired: boolean;
+    reason?: string;
+  } {
+    const batches = this.getBatches();
+    const leads = this.getLeads();
+
+    // Total leads audited in pipeline
+    const totalAudited = Math.max(
+      leads.length,
+      batches.reduce((acc, b) => acc + (b.records?.length || 0), 0)
+    );
+
+    const totalDemos = leads.filter((l) => l.status === 'meeting').length +
+      batches.reduce((acc, b) => acc + (b.metrics?.demosCount || 0), 0);
+
+    const totalPilots = leads.filter((l) => l.status === 'won').length +
+      batches.reduce((acc, b) => acc + (b.metrics?.pilotsCount || 0), 0);
+
+    const haltRequired = totalAudited >= 300 && (totalDemos < 3 || totalPilots < 1);
+
+    return {
+      totalAudited,
+      totalDemos,
+      totalPilots,
+      haltRequired,
+      reason: haltRequired
+        ? 'Alerta Anti-Fallo: Se han contactado más de 300 prospectos sin alcanzar el mínimo de 3 demos y 1 piloto pagante. Detén el escalado masivo y audita los 5 factores: 1. ICP, 2. Oferta, 3. Mensaje, 4. Canal, 5. Demo.'
+        : undefined,
+    };
   }
 }

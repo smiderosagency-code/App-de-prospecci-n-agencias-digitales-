@@ -13,7 +13,11 @@ export const Header: React.FC<Props> = ({ currentView, onNavigate, settings }) =
   const titles: Record<NavView, { title: string; subtitle: string }> = {
     search: {
       title: 'Búsqueda de Prospectos',
-      subtitle: 'Encuentra negocios locales en Colombia, detecta su brecha digital y genera tu primer contacto.',
+      subtitle: 'Encuentra clínicas dentales y centros de salud en Colombia, detecta su brecha comercial y genera tu primer contacto.',
+    },
+    batches: {
+      title: 'Lotes de Prospección & Pruebas A/B',
+      subtitle: 'Módulo Anti-Fallo: Lotes de 25 clínicas Prioridad A, pruebas A/B de canal y ángulo, y seguimiento estricto a 72h.',
     },
     radar: {
       title: 'Radar de Nichos',

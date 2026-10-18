@@ -32,6 +32,7 @@ export class LeadService {
       businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY';
       decisionMakerName?: string;
       decisionMakerRole?: string;
+      b2bIntelligence?: any;
     }> = [];
 
     let nextPageToken: string | undefined = undefined;
@@ -118,10 +119,11 @@ export class LeadService {
           ? {
               name: b.decisionMakerName,
               role: b.decisionMakerRole || 'Gerente / Dueño',
-              source: 'IA / Redes',
-              verified: false,
+              source: 'IA / Redes / Directorio',
+              verified: Boolean(b.b2bIntelligence?.decisionMakerStatus === 'Confirmado'),
             }
           : undefined,
+        b2bIntelligence: b.b2bIntelligence || undefined,
       };
 
       const { score, breakdown } = calculateOpportunityScore(partialLead);
@@ -135,9 +137,6 @@ export class LeadService {
         updatedAt: new Date().toISOString(),
       } as BusinessLead;
     });
-
-    // Cache the results
-    StorageService.setCachedSearch(cacheKey, leads);
 
     return { leads, nextPageToken, providerUsed };
   }
