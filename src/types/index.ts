@@ -153,7 +153,97 @@ export interface BatchCampaign {
   diagnosticNotes?: string;
 }
 
+export type ContactVerificationStatus = 'APTO PARA CONTACTO' | 'REQUIERE REVISIÓN' | 'DESCARTADO';
+export type ConfidenceLevel = 'Alta' | 'Media' | 'Baja';
+
+export interface WhatsAppVerification {
+  number: string; // formato internacional: +57 XXX XXX XXXX
+  type: 'institucional' | 'citas' | 'admisiones' | 'decisor' | 'desconocido';
+  source1: string; // e.g. "Google Business Profile oficial", "Sitio web oficial"
+  source2?: string; // e.g. "Instagram oficial @...", "RUES"
+  lastActivityEvidence?: string; // e.g. "Publicación hace 2 días", "Horario actualizado esta semana"
+  confidence: ConfidenceLevel;
+  status: ContactVerificationStatus;
+}
+
+export interface EmailVerification {
+  email: string; // correo exacto o vacío
+  type: 'institucional' | 'citas' | 'admisiones' | 'decisor' | 'desconocido';
+  domainType: 'oficial' | 'genérico' | 'dudoso';
+  source1: string;
+  source2?: string;
+  confidence: ConfidenceLevel;
+  status: ContactVerificationStatus;
+  unverifiableExplanation?: string;
+}
+
+export interface DecisorVerification {
+  fullName: string;
+  realRole: string;
+  relation:
+    | 'propietario'
+    | 'representante legal'
+    | 'director médico'
+    | 'administrador'
+    | 'jefe de admisiones'
+    | 'responsable comercial'
+    | 'contacto operativo';
+  evidence: string; // RUES, sitio web, LinkedIn, prensa, redes oficiales
+  authorityLevel: ConfidenceLevel;
+  dataConfidence: ConfidenceLevel;
+  isDecisorOrOperational: 'Decisor con Autoridad' | 'Contacto Operativo';
+}
+
+export interface ContactConfidenceScore {
+  score: number; // 0 a 100
+  breakdown: {
+    officialSourceBonus: number; // hasta 40 pts si verificado en fuente oficial actual
+    twoOrMoreSourcesBonus: number; // +25 pts coincidencia en dos o más fuentes independientes
+    activeWhatsAppBusinessBonus: number; // +15 pts WhatsApp Business o canal activo
+    decisorWithEvidenceBonus: number; // +10 pts decisor con evidencia
+    activeClinicBonus: number; // +10 pts clínica activa con consultas y capacidad
+  };
+  classification:
+    | 'Prioridad A — contactar hoy'
+    | 'Prioridad B — contactar después de revisión manual'
+    | 'Prioridad C — requiere investigación adicional'
+    | 'Descartado';
+}
+
+// 7. FORMATO OBLIGATORIO DE ENTREGA (16 Campos Exactos)
+export interface StrictContactValidationTable {
+  clinica: string;
+  ciudadSede: string;
+  servicioPrincipalAltoValor: string;
+  decisorIdentificado: string;
+  cargoYAutoridad: string;
+  evidenciaDecisor: string;
+  whatsappValidado: string;
+  tipoWhatsApp: string;
+  fuentesWhatsApp: string;
+  correoValidado: string;
+  fuentesCorreo: string;
+  nivelConfianza: string;
+  scoreContacto: number;
+  estado: ContactVerificationStatus;
+  riesgoODatoFaltante: string;
+  proximaAccionRecomendada: string;
+  rutaAlternativa?: string;
+}
+
+export interface StrictContactValidation {
+  whatsapp: WhatsAppVerification;
+  email: EmailVerification;
+  decisor: DecisorVerification;
+  confidenceScore: ContactConfidenceScore;
+  mandatoryTable: StrictContactValidationTable;
+  alternativeRoute?: string;
+}
+
 export interface B2BIntelligence {
+  // BONUS PLUS: VALIDACIÓN ESTRICTA DE CONTACTOS
+  strictContactValidation?: StrictContactValidation;
+
   // MÓDULO ANTI-FALLO: 1. Filtro "Lista para Comprar"
   readyToBuyStatus: ReadyToBuyStatus;
   readyToBuyChecklist: ReadyToBuyChecklist;
@@ -318,4 +408,6 @@ export interface SearchFilters {
   onlyHighIntent?: boolean;
   onlyWithDecisor?: boolean;
   readyToBuyFilter?: 'ALL' | 'SÍ' | 'TAL VEZ' | 'NO';
+  onlyAptoParaContacto?: boolean;
+  minContactScore?: number;
 }
